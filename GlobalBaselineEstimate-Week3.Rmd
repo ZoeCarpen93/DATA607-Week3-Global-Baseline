@@ -1,29 +1,120 @@
 ---
-title: "GlobalBaselineEstimate-Week 3"
+title: "Assignment 3 – Global Baseline Estimate"
+author: "Zoe Carpentieri"
+date: "`r Sys.Date()`"
 output: html_document
-date: "2025-09-13"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Introduction
+
+In this assignment, we implement a **Global Baseline Estimate** recommender system using survey data of album ratings. What I did first is I created a pivot table in Excel, because that's what I'm most accustomed to, and then I modeled my R code after the steps I took there. 
+
+The Global Baseline model predicts ratings based on three parts:
+
+- The global mean rating (μ)  
+- User bias (bᵤ): how much each person rates above or below the mean  
+- Item bias (bᵢ): how much each album is rated above or below the mean  
+
+Our goal is to fill in missing ratings with predicted values using this formula:  
+
+\[
+\hat{r}_{u,i} = \mu + b_u + b_i
+\]
+
+
+---
+
+# Step 1: Load Raw Data
+
+Here's how I loaded the raw data from a CSV
+
+```{r load-data, message=FALSE, warning=FALSE}
+library(readr)
+library(dplyr)
+
+# Load CSV from /data folder
+ratings_df <- read_csv("data/AlbumRatingsAnalysis-Raw.csv")
+
+# Inspect first rows
+head(ratings_df)
 ```
 
-## R Markdown
+# Step 2: Global Mean
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+I created a variable, "mu", to hold the overall ratings mean
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r global-mean}
+mu <- mean(ratings_df$rating, na.rm = TRUE)
+mu
 ```
 
-## Including Plots
+# Step 3: User Bias
 
-You can also embed plots, for example:
+I've created a table that calculates user bias by person
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r user-bias}
+user_bias <- ratings_df %>%
+  group_by(person) %>%
+  summarise(user_avg = mean(rating, na.rm = TRUE)) %>%
+  mutate(b_u = user_avg - mu)
+
+head(user_bias)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# Step 4: Item Bias
+
+I've created a table to show "item bias" which is the average rating by album
+
+```{r item-bias}
+item_bias <- ratings_df %>%
+  group_by(album) %>%
+  summarise(album_avg = mean(rating, na.rm = TRUE)) %>%
+  mutate(b_i = album_avg - mu)
+
+head(item_bias)
+```
+
+# Step 5: Predictions
+
+This predictions table created all possible combinations of person and album. Then I joined in user bias and item bias. Finally, I created a column following the formula from above to calculate the predicted ratings for all combinations. 
+
+```{r predictions}
+predictions <- expand.grid(
+  person = unique(ratings_df$person),
+  album  = unique(ratings_df$album)
+) %>%
+  left_join(user_bias, by = "person") %>%
+  left_join(item_bias, by = "album") %>%
+  mutate(pred_rating = mu + b_u + b_i)
+
+head(predictions)
+```
+
+
+# Step 6: Recommendations (Missing Ratings Only)
+
+I then created a table with only the people who have NULL in any rating. That way, we can see what they would have rated based on our prediction. 
+
+```{r recommendations}
+recommendations <- ratings_df %>%
+  left_join(predictions, by = c("person", "album")) %>%
+  filter(is.na(rating)) %>%
+  select(person, album, rating, pred_rating)
+
+head(recommendations)
+```
+
+# Step 7: Compare with Actual Ratings
+
+I joined the tables together so the real rating and the predicted ratings can be in one place and be viewed side by side.
+
+```{r compare}
+results <- ratings_df %>%
+  left_join(predictions, by = c("person", "album"))
+
+head(results)
+```
+
+
+
+# Thank you for reading! This was a fun one, I learned a lot.

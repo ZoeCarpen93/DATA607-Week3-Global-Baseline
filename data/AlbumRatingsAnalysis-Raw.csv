@@ -1,4 +1,4 @@
-ID,Name,Album,Heard Album?,Rating
+id,person,album,heard_yn,rating
 1,Giana,Midwest Princess - Chappell,Yes,5
 2,Jacob,Midwest Princess - Chappell,Yes,3
 3,Aalana,Midwest Princess - Chappell,Yes,4
